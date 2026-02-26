@@ -13,13 +13,13 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - app_net
+      - app-network
 
   redis:
     image: redis:7-alpine
     container_name: dz5-redis-1
     networks:
-      - app_net
+      - app-network
 
   web:
     build: ./app
@@ -30,12 +30,12 @@ services:
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/flask_db
     networks:
-      - app_net
+      - app-network
     expose:
       - "5000"
 
   nginx:
-    image: nginx:alpine
+    build: ./nginx                     # сборка из Dockerfile с VTS
     container_name: dz5-nginx-1
     ports:
       - "80:80"
@@ -44,11 +44,89 @@ services:
     depends_on:
       - web
     networks:
-      - app_net
+      - app-network
 
-networks:
-  app_net:
-    driver: bridge
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - app-network
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://user:password@db:5432/flask_db?sslmode=disable"
+    networks:
+      - app-network
+    depends_on:
+      - db
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+    depends_on:
+      - loki
+    restart: unless-stopped
 
 volumes:
   pg_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  app-network:
+    driver: bridge
