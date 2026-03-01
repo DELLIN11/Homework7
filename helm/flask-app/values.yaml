@@ -1,0 +1,11 @@
+image:
+  repository: nikiyan/flask-k8s-app
+  tag: "v1"
+
+postgres:
+  user: "user"
+  password: "password"
+  db: "flask_db"
+
+redis:
+  host: "redis"
