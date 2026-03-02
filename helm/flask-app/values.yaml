@@ -1,6 +1,6 @@
 image:
   repository: nikiyan/flask-k8s-app
-  tag: "v1"
+  tag: "supervisor"   # замените старый тег на новый
 
 postgres:
   user: "user"
