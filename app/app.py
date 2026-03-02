@@ -75,7 +75,12 @@ def delete_user(uid):
     cache.delete(f'user_{uid}')
     return '', 204
 
+# Создание таблиц базы данных при старте приложения (для Gunicorn)
+with app.app_context():
+    db.create_all()
+
 if __name__ == '__main__':
+    # Для локального запуска (опционально, но оставляем)
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000)
